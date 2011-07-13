@@ -108,7 +108,7 @@
 	(if keep-alive?
 	  (restart)
 	  (close a))))
-    (pipelined-server b handler
+    (server b handler
       (assoc options
 	:include-request true
 	:response-channel #(wrap-response-channel (constant-channel))))
