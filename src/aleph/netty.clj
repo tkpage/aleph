@@ -11,7 +11,8 @@
   (:use
     [clojure.contrib.def :only (defvar- defmacro-)]
     [lamina core trace api]
-    [aleph formats core])
+    [aleph formats core]
+    [gloss core])
   (:require
     [clj-http.client :as client]
     [clojure.contrib.logging :as log])
@@ -177,7 +178,7 @@
 			    (when-not (trace error-probe
 					{:exception ex
 					 :address (-> ex .getChannel channel-origin)})
-			      (log/error ex)))
+			      (log/error nil ex)))
 			  nil))
 	traffic-handler (fn [probe-suffix]
 			  (let [traffic-probe (canonical-probe [pipeline-name :traffic probe-suffix])]
@@ -198,6 +199,15 @@
     (.addFirst netty-pipeline "incoming-error"
       (upstream-stage error-handler))
     netty-pipeline))
+
+;;;
+
+(defn create-frame [frame delimiters strip-delimiters?]
+  (cond
+    (and frame delimiters) (delimited-frame delimiters frame)
+    (and frame (not delimiters)) (compile-frame frame)
+    (and (not frame) delimiters) (delimited-block delimiters (or strip-delimiters? true))
+    :else nil))
 
 ;;;
 
@@ -363,7 +373,7 @@
 	  (.close channel-group)
 	  wrap-netty-channel-group-future
 	  (fn [_]
-	    (task (.releaseExternalResources server)))))
+	    (future (.releaseExternalResources server)))))
       (stop-server [this timeout]
 	(reset! refuse-connections? true)
 	(graceful-shutdown this timeout))
@@ -441,7 +451,7 @@
 	      (run-pipeline
 		(.close channel-group)
 		wrap-netty-channel-group-future
-		(fn [_] (task (.releaseExternalResources client))))))
+		(fn [_] (future (.releaseExternalResources client))))))
 	  (.add channel-group netty-channel)
 	  (run-pipeline
 	    (receive-in-order outer
